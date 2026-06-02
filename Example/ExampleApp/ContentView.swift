@@ -1,30 +1,54 @@
+//
+//  ContentView.swift
+//  ExampleApp
+//
+//  Root view of the app.
+//
+//  `NavigationTabView(routerManager:flows:)` is the SDK component that:
+//  - renders a `TabView` bound to `routerManager.selectedFlow`;
+//  - wraps each tab's root view in its own `NavigationStackView` automatically;
+//  - lazily creates a `Router` per tab on demand.
+//
+//  The `flows:` array declares exactly **which** flows are tabs.
+//  `.settings` and `.nestedSheet` are intentionally excluded:
+//   - `.settings`    is opened modally from Home as a `fullScreenCover`.
+//   - `.nestedSheet` is an auxiliary flow used inside the Advanced tab's sheet
+//                    to provide a second presentation slot (stacking demo).
+//
+
 import SwiftUI
 import PharosNav
 
 struct ContentView: View {
+
     @State private var appRouterManager: AppRouterManager = .shared
 
     var body: some View {
-        // .nowPlaying is intentionally excluded from the flows array — it is a standalone
-        // modal flow presented as fullScreenCover from within any tab.
         NavigationTabView(
             routerManager: appRouterManager,
-            flows: [.library, .discover]
+            flows: [.home, .profile, .advanced]
         ) { flow in
             switch flow {
-            case .library:
+            case .home:
                 NavigationTabItem {
-                    Label("Library", systemImage: "music.note.list")
+                    Label("Home", systemImage: "house")
                 } content: {
-                    LibraryScreen()
+                    HomeScreen()
                 }
-            case .discover:
+            case .profile:
                 NavigationTabItem {
-                    Label("Discover", systemImage: "safari")
+                    Label("Profile", systemImage: "person.crop.circle")
                 } content: {
-                    DiscoverScreen()
+                    ProfileScreen()
                 }
-            case .nowPlaying:
+            case .advanced:
+                NavigationTabItem {
+                    Label("Advanced", systemImage: "square.stack.3d.up")
+                } content: {
+                    AdvancedScreen()
+                }
+            case .settings, .nestedSheet:
+                // Non-tab flows.
                 nil
             }
         }
