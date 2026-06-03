@@ -60,9 +60,9 @@ The package defaults to `@MainActor` isolation (set in `Package.swift`).
 1. **File** → **Add Package Dependencies…**
 2. Enter the repository URL:
    ```
-   https://git.smile.fr/neopixl/r-and-d/PharosNav.git
+   https://github.com/neopixl/PharosNav-ios.git
    ```
-3. Pick a version (≥ 2.0.0) or a branch.
+3. Pick a version (≥ 1.0.0) or a branch.
 4. Add the `PharosNav` library to your app target.
 
 ### Via `Package.swift`
@@ -70,8 +70,8 @@ The package defaults to `@MainActor` isolation (set in `Package.swift`).
 ```swift
 dependencies: [
     .package(
-        url: "https://git.smile.fr/neopixl/r-and-d/PharosNav.git",
-        from: "2.0.0"
+        https://github.com/neopixl/PharosNav-ios.git",
+        from: "1.0.0"
     )
 ],
 targets: [
