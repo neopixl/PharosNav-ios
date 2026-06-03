@@ -47,7 +47,7 @@ struct ContentView: View {
                 } content: {
                     AdvancedScreen()
                 }
-            case .settings, .nestedSheet:
+            case .settings, .nestedSheet, .chainModal:
                 // Non-tab flows.
                 nil
             }

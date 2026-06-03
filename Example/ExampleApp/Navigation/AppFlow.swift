@@ -15,6 +15,9 @@
 //  - `.nestedSheet` → a **standalone auxiliary** flow used ONLY to provide a
 //                     second presentation slot for the sheet-stacking demo
 //                     (also excluded from the `flows:` array).
+//  - `.chainModal`  → a **standalone auxiliary** flow used by the
+//                     push → modal → push chain to host the modal's own
+//                     nested NavigationStack (also excluded from `flows:`).
 //
 //  Rule of thumb: **1 Router = 1 presentation slot**. To stack a sheet over
 //  another sheet you need *another* router → another flow.
@@ -28,4 +31,5 @@ enum AppFlow: AppFlowProtocol {
     case advanced
     case settings
     case nestedSheet
+    case chainModal
 }

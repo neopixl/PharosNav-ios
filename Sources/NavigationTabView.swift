@@ -79,7 +79,6 @@ public struct NavigationTabView<Tab: AppFlowProtocol, Content: View>: View {
     }
 
     // MARK: - View
-
     public var body: some View {
         TabView(selection: $selection) {
             content()
@@ -117,10 +116,16 @@ extension NavigationTabView {
     /// - Parameters:
     ///   - routerManager: The shared router manager that owns a `Router` per flow.
     ///   - flows: The flows exposed as tabs, in display order.
+    ///   - hidesTabBarOnPush: When `true` (default), each tab's tab bar is hidden as
+    ///     soon as the corresponding `Router` has at least one destination on its
+    ///     navigation path — and restored when popped back to the root. Set to `false`
+    ///     to keep SwiftUI's native behaviour where the tab bar stays visible during
+    ///     pushed navigation.
     ///   - tab: A closure mapping each `Tab` value to a `NavigationTabItem`, or `nil` to skip it.
     public init<Destination: AppDestinationProtocol>(
         routerManager: RouterManager<Tab, Destination>,
         flows: [Tab],
+        hidesTabBarOnPush: Bool = true,
         tab: @escaping (Tab) -> NavigationTabItem?
     ) where Content == _RouterManagerTabBody<Tab, Destination> {
         self._selection = Binding(
@@ -128,7 +133,14 @@ extension NavigationTabView {
             set: { routerManager.selectedFlow = $0 }
         )
         let rm = routerManager
-        self.content = { _RouterManagerTabBody(routerManager: rm, flows: flows, tab: tab) }
+        self.content = {
+            _RouterManagerTabBody(
+                routerManager: rm,
+                flows: flows,
+                hidesTabBarOnPush: hidesTabBarOnPush,
+                tab: tab
+            )
+        }
     }
 
     /// Creates a `NavigationTabView` driven by a `RouterManager`, with every case
@@ -140,12 +152,20 @@ extension NavigationTabView {
     ///
     /// - Parameters:
     ///   - routerManager: The shared router manager that owns a `Router` per flow.
+    ///   - hidesTabBarOnPush: See ``init(routerManager:flows:hidesTabBarOnPush:tab:)``.
+    ///     Defaults to `true`.
     ///   - tab: A closure mapping each `Tab` value to a `NavigationTabItem`, or `nil` to skip it.
     public init<Destination: AppDestinationProtocol>(
         routerManager: RouterManager<Tab, Destination>,
+        hidesTabBarOnPush: Bool = true,
         tab: @escaping (Tab) -> NavigationTabItem?
     ) where Tab: CaseIterable, Content == _RouterManagerTabBody<Tab, Destination> {
-        self.init(routerManager: routerManager, flows: Array(Tab.allCases), tab: tab)
+        self.init(
+            routerManager: routerManager,
+            flows: Array(Tab.allCases),
+            hidesTabBarOnPush: hidesTabBarOnPush,
+            tab: tab
+        )
     }
 
 }
@@ -159,19 +179,57 @@ public struct _RouterManagerTabBody<Tab: AppFlowProtocol, Destination: AppDestin
 
     @Bindable var routerManager: RouterManager<Tab, Destination>
     let flows: [Tab]
+    let hidesTabBarOnPush: Bool
     let tab: (Tab) -> NavigationTabItem?
 
     public var body: some View {
         ForEach(flows, id: \.self) { flow in
             if let item = tab(flow) {
-                NavigationStackView(
-                    routerManager: routerManager,
-                    flow: flow,
-                    initialContent: item.content
-                )
-                .tabItem { item.label }
+                tabContent(for: flow, item: item)
             }
         }
+    }
+
+}
+
+// MARK: - Private helpers
+
+private extension _RouterManagerTabBody {
+
+    /// Per-tab content with reactive tab-bar visibility.
+    ///
+    /// Hiding the tab bar **on the destination view** (the SwiftUI-stock workaround)
+    /// produces a visible lag on back: the destination is torn down first, then the
+    /// tab bar animates back in as a separate transition. Instead we bind the tab-bar
+    /// visibility to the tab's own `Router.navigationPath` emptiness, *here at the
+    /// root of the tab*. The toolbar visibility update is synchronous with the path
+    /// change → it animates together with the push / pop, no flicker.
+    ///
+    /// Reactivity: `routerManager` is `@Bindable` and `Router` is `@Observable`, so
+    /// reading `router.navigationPath.isEmpty` inside this view body registers as a
+    /// dependency and re-evaluates on push / pop.
+    @ViewBuilder
+    func tabContent(for flow: Tab, item: NavigationTabItem) -> some View {
+        let router = routerManager.getRouter(for: flow)
+        NavigationStackView(
+            routerManager: routerManager,
+            flow: flow,
+            initialContent: item.content
+        )
+        .tabItem { item.label }
+        .toolbar(
+            tabBarVisibility(for: router),
+            for: .tabBar
+        )
+    }
+
+    /// Resolves the desired tab-bar visibility for a given flow's router.
+    ///
+    /// When `hidesTabBarOnPush` is disabled, we return `.automatic` so SwiftUI keeps
+    /// its native behaviour (tab bar stays visible during pushed navigation).
+    func tabBarVisibility(for router: Router<Destination>) -> Visibility {
+        guard hidesTabBarOnPush else { return .automatic }
+        return router.navigationPath.isEmpty ? .visible : .hidden
     }
 
 }

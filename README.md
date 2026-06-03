@@ -101,13 +101,12 @@ The full pattern in **7 steps**. Each step is a small file you write once per fe
 Each feature declares its own destination enum conforming to `DestinationItem`:
 
 ```swift
-// Features/Persons/PersonDestination.swift
+// Features/Home/HomeDestination.swift
 import PharosNav
 
-enum PersonDestination: DestinationItem {
-    case home
-    case details
-    case add(name: String)
+enum HomeDestination: DestinationItem {
+    case detail(id: Int)
+    case about
 }
 ```
 
@@ -120,9 +119,9 @@ A *flow* is any independent navigation context — a tab, an onboarding stack, a
 import PharosNav
 
 enum AppFlow: AppFlowProtocol, CaseIterable {
-    case cat       // tab
-    case fruit     // tab
-    case person    // standalone flow — presented modally, not a tab
+    case home      // tab
+    case profile   // tab
+    case settings  // standalone flow — presented modally, not a tab
 }
 ```
 
@@ -138,9 +137,9 @@ import PharosNav
 
 @RecursiveDestination
 enum AppDestination: AppDestinationProtocol {
-    case cat(CatDestination)
-    case fruit(FruitDestination)
-    case person(PersonDestination)
+    case home(HomeDestination)
+    case profile(ProfileDestination)
+    case settings(SettingsDestination)
 }
 ```
 
@@ -149,17 +148,16 @@ enum AppDestination: AppDestinationProtocol {
 Each feature registers its own destinations in its own extension of `NavigationRegistry` — there is no central switch:
 
 ```swift
-// Features/Persons/Navigation/NavigationRegistry+PersonDestination.swift
+// Features/Home/Navigation/NavigationRegistry+HomeDestination.swift
 import SwiftUI
 import PharosNav
 
 extension NavigationRegistry {
-    func registerPersonDestination() {
-        self.register(PersonDestination.self) { destination in
+    func registerHomeDestination() {
+        self.register(HomeDestination.self) { destination in
             switch destination {
-            case .home:           PersonScreen()
-            case .details:        PersonDetailsScreen()
-            case .add(let name):  AddPersonScreen(name: name)
+            case .detail(let id): HomeDetailScreen(id: id)
+            case .about:          HomeAboutScreen()
             }
         }
     }
@@ -176,9 +174,9 @@ import PharosNav
 @main
 struct MyApp: App {
     init() {
-        NavigationRegistry.shared.registerPersonDestination()
-        NavigationRegistry.shared.registerCatDestination()
-        NavigationRegistry.shared.registerFruitDestination()
+        NavigationRegistry.shared.registerHomeDestination()
+        NavigationRegistry.shared.registerProfileDestination()
+        NavigationRegistry.shared.registerSettingsDestination()
     }
 
     var body: some Scene {
@@ -202,7 +200,7 @@ final class AppRouterManager: RouterManager<AppFlow, AppDestination> {
     static let shared = AppRouterManager()
 
     init() {
-        super.init(selectedFlow: .cat)
+        super.init(selectedFlow: .home)
     }
 }
 ```
@@ -211,7 +209,7 @@ You do **not** need to manually create `Router` instances — `RouterManager` al
 
 ### 6. Build the root view
 
-Pass `flows:` to declare exactly **which** flows are tabs. The SDK wraps each tab's content in a `NavigationStackView` automatically. Other flows (like `.person` below) remain routable for modal/programmatic navigation but never appear in the tab bar:
+Pass `flows:` to declare exactly **which** flows are tabs. The SDK wraps each tab's content in a `NavigationStackView` automatically. Other flows (like `.settings` below) remain routable for modal/programmatic navigation but never appear in the tab bar:
 
 ```swift
 // ContentView.swift
@@ -224,23 +222,23 @@ struct ContentView: View {
     var body: some View {
         NavigationTabView(
             routerManager: routerManager,
-            flows: [.cat, .fruit]   // .person is intentionally excluded
+            flows: [.home, .profile]   // .settings is intentionally excluded
         ) { flow in
             switch flow {
-            case .cat:
+            case .home:
                 NavigationTabItem {
-                    Label("Cats", systemImage: "cat.fill")
+                    Label("Home", systemImage: "house")
                 } content: {
-                    CatsListScreen()
+                    HomeScreen()
                 }
-            case .fruit:
+            case .profile:
                 NavigationTabItem {
-                    Label("Fruits", systemImage: "apple.logo")
+                    Label("Profile", systemImage: "person.crop.circle")
                 } content: {
-                    FruitsListScreen()
+                    ProfileScreen()
                 }
-            case .person:
-                nil   // `.person` is a standalone flow, not a tab
+            case .settings:
+                nil   // `.settings` is a standalone flow, not a tab
             }
         }
     }
@@ -250,25 +248,25 @@ struct ContentView: View {
 Then, from one of the tabs, present the standalone flow modally:
 
 ```swift
-// CatsListScreen.swift
-GenericNavigationButton(target: .fullScreenCover(AppDestination.person(.home))) {
-    Text("Open the Person flow")
+// HomeScreen.swift
+GenericNavigationButton(target: .fullScreenCover(AppDestination.settings(.root))) {
+    Text("Open the Settings flow")
 }
 ```
 
-And inside `PersonScreen`, opt out of the tab lifecycle with `isTabPage: false` so the router is unregistered and the previous flow is restored when the user dismisses it:
+And inside `SettingsRootScreen`, opt out of the tab lifecycle with `isTabPage: false` so the router is unregistered and the previous flow is restored when the user dismisses it:
 
 ```swift
-struct PersonScreen: View {
+struct SettingsRootScreen: View {
     private let routerManager = AppRouterManager.shared
 
     var body: some View {
         NavigationStackView(
             routerManager: routerManager,
-            flow: .person,
+            flow: .settings,
             isTabPage: false
         ) {
-            // Person flow root content
+            // Settings flow root content
         }
     }
 }
@@ -283,16 +281,16 @@ struct PersonScreen: View {
 Use `GenericNavigationButton` with a `NavigationTarget` to push, present, or full-screen any destination:
 
 ```swift
-GenericNavigationButton(target: .push(AppDestination.person(.details))) {
-    Text("Open person details")
+GenericNavigationButton(target: .push(AppDestination.home(.detail(id: 1)))) {
+    Text("Open detail")
 }
 
-GenericNavigationButton(target: .sheet(.medium, AppDestination.person(.home))) {
+GenericNavigationButton(target: .sheet(.medium, AppDestination.profile(.edit))) {
     Text("Open as medium sheet")
 }
 
-GenericNavigationButton(target: .fullScreenCover(AppDestination.person(.home))) {
-    Text("Open in full screen")
+GenericNavigationButton(target: .fullScreenCover(AppDestination.settings(.root))) {
+    Text("Open the Settings flow")
 }
 ```
 
@@ -309,8 +307,8 @@ struct AppNavigationButton<Label: View>: View {
 }
 
 // Usage — note the leading-dot syntax works here:
-AppNavigationButton(target: .push(.person(.details))) {
-    Text("Open person details")
+AppNavigationButton(target: .push(.home(.detail(id: 1)))) {
+    Text("Open detail")
 }
 ```
 
@@ -371,6 +369,29 @@ A type-safe enum encoding every valid navigation action. Use it with `GenericNav
 | `dismiss()` | Dismiss the active presentation (or pop if no presentation). |
 | `isPagePresented` / `isSheetPresented` / `isFullScreenPresented` | State predicates. |
 
+### `NavigationTabView<Tab, Content>`
+
+Convenience initializers (preferred):
+
+| Init | Description |
+|---|---|
+| `init(routerManager:flows:hidesTabBarOnPush:tab:)` | Renders only the flows you pass in `flows:` as tabs. Other flows stay routable (for modal / programmatic navigation) but never appear in the tab bar. |
+| `init(routerManager:hidesTabBarOnPush:tab:)` *(where `Tab: CaseIterable`)* | Shortcut that turns **every** case of your flow enum into a tab. |
+| `init(selection:content:)` *(legacy)* | Full manual control — you build each tab's `NavigationStackView` and `.tabItem` yourself. |
+
+**`hidesTabBarOnPush: Bool = true`** — when `true` (default), each tab's tab bar is hidden as soon as its `Router.navigationPath` becomes non-empty, and restored when it goes back to empty. The visibility toggle is bound at the tab root (not on the pushed view) so it animates in sync with the push / pop — no flicker. Set to `false` to keep SwiftUI's native behaviour where the tab bar stays visible during pushed navigation.
+
+```swift
+// Opt-out: keep the tab bar visible while pushing
+NavigationTabView(
+    routerManager: routerManager,
+    flows: [.home, .profile],
+    hidesTabBarOnPush: false
+) { flow in /* … */ }
+```
+
+---
+
 ### `RouterManager<Flow, Destination>` public surface
 
 | Member | Description |
@@ -388,20 +409,20 @@ A type-safe enum encoding every valid navigation action. Use it with `GenericNav
 Each feature module owns its destinations end-to-end. A feature exposes a `register…Destination()` method on `NavigationRegistry`, and the host app only needs to know its name:
 
 ```swift
-// In the Persons module
+// In the Home module
 extension NavigationRegistry {
-    public func registerPersonDestination() {
-        self.register(PersonDestination.self) { destination in
+    public func registerHomeDestination() {
+        self.register(HomeDestination.self) { destination in
             switch destination {
-            case .home:    PersonScreen()
-            case .details: PersonDetailsScreen()
+            case .detail(let id): HomeDetailScreen(id: id)
+            case .about:          HomeAboutScreen()
             }
         }
     }
 }
 
 // In the host app
-NavigationRegistry.shared.registerPersonDestination()
+NavigationRegistry.shared.registerHomeDestination()
 ```
 
 The registry uses `ObjectIdentifier` keys, so renames or module-path changes will not silently break lookups. In debug builds, an unresolved destination triggers `assertionFailure` with a clear message; in release builds it logs through `os.Logger` and falls back to a visible diagnostic view.
@@ -409,6 +430,18 @@ The registry uses `ObjectIdentifier` keys, so renames or module-path changes wil
 ---
 
 ## Advanced
+
+### Tab-bar visibility on push
+
+Since iOS 16, a `NavigationStack` placed **inside** a `TabView` no longer auto-hides the tab bar when a destination is pushed (unlike the legacy `NavigationView`). The community workaround — applying `.toolbar(.hidden, for: .tabBar)` on the pushed destination — works, but causes a visible animation lag on back: the destination is torn down first, then the tab bar slides back in as a separate transition.
+
+PharosNav defaults to a cleaner behaviour: the `NavigationTabView` binds tab-bar visibility to each tab's `Router.navigationPath.isEmpty` **at the root of the tab** (not on the pushed view). Because `Router` is `@Observable`, the visibility update is synchronous with the path mutation — the tab bar animates in/out in sync with the push/pop, no flicker.
+
+Controlled by the `hidesTabBarOnPush` parameter on the convenience inits (defaults to `true`). Pass `false` to restore SwiftUI's native behaviour. Per-tab behaviour: switching to a tab with a non-empty path hides the bar; switching back to one with an empty path shows it.
+
+> **Note:** the legacy `init(selection:content:)` does not own the `RouterManager`, so it cannot drive this behaviour — if you reach for the legacy init you opt back into SwiftUI's native default by construction.
+
+---
 
 ### `isTabPage` — lifecycle cleanup
 
@@ -424,29 +457,31 @@ Each `NavigationStackView` owns exactly one presentation slot (a sheet or a full
 **Stacking a sheet on top of another sheet** is achievable by nesting a `NavigationStackView(isTabPage: false)` inside the first sheet's content. SwiftUI then renders the outer `NavigationStack`'s sheet modifier and the inner one independently — stacking them naturally.
 
 ```swift
-// ✅ Sheet-over-sheet: PersonScreen wraps its content in a NavigationStackView.
-// The environment `Router` injected to PersonDetailsScreen is the person router.
-// Calling router.present(...) from PersonDetailsScreen triggers the inner stack's
-// sheet modifier — SwiftUI stacks a new sheet on top without disturbing the outer one.
-struct PersonScreen: View {
+// ✅ Sheet-over-sheet: FirstSheetRootScreen is the content of the *outer* sheet
+// (presented by the Advanced tab's router). It wraps itself in a nested
+// NavigationStackView bound to an **auxiliary** flow (`.nestedSheet`) — that
+// nested router has its own presentation slot. Pushing inside it, then calling
+// `present(...)` from a pushed screen, stacks a new sheet on top of the outer
+// one instead of replacing it.
+struct FirstSheetRootScreen: View {
     var body: some View {
         NavigationStackView(
             routerManager: AppRouterManager.shared,
-            flow: .person,
+            flow: .nestedSheet,
             isTabPage: false    // <-- critical: non-tab flow
         ) {
-            PersonDetailsScreen()
+            FirstSheetPushedScreen()
         }
     }
 }
 
-struct PersonDetailsScreen: View {
+struct FirstSheetPushedScreen: View {
     @Environment(Router<AppDestination>.self) private var router
 
     var body: some View {
-        Button("Open settings") {
-            // Uses the person router → stacks a new sheet on top of the person sheet
-            router.present(route: .sheet(style: .large), .person(.settings))
+        Button("Stack a second sheet on top") {
+            // Uses the .nestedSheet router → stacks on top of the outer sheet
+            router.present(route: .sheet(style: .large), .advanced(.stackedSheetRoot))
         }
     }
 }
@@ -489,13 +524,13 @@ Always let the `RouterManager` own the `Router` lifetime. Use the convenience in
 
 ```swift
 // ✅ Correct — the manager owns the Router, it survives every body rebuild.
-struct PersonScreen: View {
+struct SettingsRootScreen: View {
     private let routerManager = AppRouterManager.shared
 
     var body: some View {
         NavigationStackView(
             routerManager: routerManager,
-            flow: .person,
+            flow: .settings,
             isTabPage: false
         ) {
             // …
@@ -508,7 +543,7 @@ Do **not** write this:
 
 ```swift
 // ❌ Wrong — a fresh Router is created on every View rebuild.
-struct PersonScreen: View {
+struct SettingsRootScreen: View {
     private let router: Router<AppDestination> = .init()
     private let routerManager = AppRouterManager.shared
 
@@ -516,7 +551,7 @@ struct PersonScreen: View {
         NavigationStackView(
             router: router,
             routerManager: routerManager,
-            flow: .person,
+            flow: .settings,
             isTabPage: false
         ) { /* … */ }
     }
@@ -556,15 +591,39 @@ The default `id` is derived from `hashValue`. Two cases with the same associated
 
 ## Example app
 
-A fully working sample app is included in `Example/ExampleApp.xcodeproj`. It demonstrates:
+A fully working sample app is included in `Example/ExampleApp.xcodeproj`. Every screen is annotated to explain what it demonstrates — read it like a runnable tutorial.
 
-- Tab navigation with three flows (`cat`, `fruit`, `person`).
-- Push, medium / large / fit-content sheets, and full-screen covers.
-- A secondary flow presented on top of the tab bar (`isTabPage: false`).
-- Auto-detecting dismiss buttons inside both pushed and presented views.
-- Cross-flow navigation via `RouterManager.navigateToFlow(_:then:)`.
+### Layout
 
-Open it from the package root:
+```
+Example/ExampleApp/
+├── App.swift                       ← registers every feature's destinations
+├── ContentView.swift               ← NavigationTabView(flows: [.home, .profile, .advanced])
+├── Navigation/
+│   ├── AppFlow.swift               ← .home / .profile / .advanced / .settings / .nestedSheet / .chainModal
+│   ├── AppDestination.swift        ← @RecursiveDestination wrapper
+│   ├── AppRouterManager.swift      ← singleton, selectedFlow: .home
+│   ├── Components/
+│   │   └── AppNavigationButton.swift   ← typed wrapper for leading-dot syntax
+│   └── Destinations/               ← one DestinationItem enum per feature
+├── Features/
+│   ├── Home/                       ← simple push patterns
+│   ├── Profile/                    ← sheet variants + Routable ViewModel
+│   ├── Advanced/                   ← sheet stacking + push → modal → push
+│   └── Settings/                   ← standalone modal flow (isTabPage: false)
+└── Shared/Protocols/Routable.swift ← `var router: Router<AppDestination>?`
+```
+
+### What each tab teaches
+
+| Tab | Scenarios |
+|---|---|
+| **Home** | `.push(.detail(id:))` and `.push(.about)` — the simplest push case. Plus a button that opens the standalone Settings flow via `.fullScreenCover(.settings(.root))`. |
+| **Profile** | The three `SheetStyle` variants (`.medium`, `.large`, `.canFullScreen`), plus a `@Observable` ViewModel adopting `Routable` to drive navigation from non-View code. |
+| **Advanced** | Two compound patterns: **sheet stacking** (outer sheet → push inside → second sheet stacked on top, using the auxiliary `.nestedSheet` flow) and **push → modal → push** (push on the tab stack → present a sheet → push inside the sheet's own stack, using the auxiliary `.chainModal` flow). |
+| **Settings** *(not a tab)* | Standalone modal flow opened as `fullScreenCover` from Home. Demonstrates `isTabPage: false`, every `DismissBehavior` (`.auto` / `.pop` / `.popToRoot`), and a `dismissAction:` trick that closes the whole modal from a deep-pushed screen by dismissing the presentation owned by `previousFlow`'s router. |
+
+### Open it
 
 ```bash
 open Example/ExampleApp.xcodeproj
