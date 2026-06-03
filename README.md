@@ -70,7 +70,7 @@ The package defaults to `@MainActor` isolation (set in `Package.swift`).
 ```swift
 dependencies: [
     .package(
-        https://github.com/neopixl/PharosNav-ios.git",
+        url: "https://github.com/neopixl/PharosNav-ios.git",
         from: "1.0.0"
     )
 ],
