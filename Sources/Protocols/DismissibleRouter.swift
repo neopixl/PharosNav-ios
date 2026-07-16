@@ -22,7 +22,7 @@ public protocol DismissibleRouter: AnyObject {
 // MARK: - Environment key
 
 struct DismissibleRouterKey: EnvironmentKey {
-    static let defaultValue: (any DismissibleRouter)? = nil
+    static var defaultValue: (any DismissibleRouter)? { nil }
 }
 
 public extension EnvironmentValues {

@@ -43,9 +43,6 @@ let package = Package(
             exclude: [
                 "PharosNavMacrosPlugin",
                 "PharosNavMacros"
-            ],
-            swiftSettings: [
-                .defaultIsolation(MainActor.self)
             ]
         ),
         .testTarget(
